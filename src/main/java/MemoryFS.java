@@ -170,6 +170,23 @@ public class MemoryFS extends FileSystemStub {
         MemoryINode mockINode = new MemoryINode();
         // set up the stat information for this inode
 
+        FileStat stat = new FileStat(Runtime.getSystemRuntime());
+        // you will have to add more stat information here eventually
+        stat.st_mode.set(mode);
+        stat.st_atim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_atim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        stat.st_mtim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        stat.st_mtim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_ctim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_ctim.tv_sec.set(System.currentTimeMillis()/ 1000);
+
+        stat.st_uid.set(unix.getUid());
+        stat.st_gid.set(unix.getGid());
+        stat.st_nlink.set(1);
+        stat.st_rdev.set(rdev);
+        mockINode.setStat(stat);
+
+
         iNodeTable.updateINode(path, mockINode);
 
         if (isVisualised()) {
@@ -217,6 +234,10 @@ public class MemoryFS extends FileSystemStub {
             return -ErrorCodes.ENONET();
         }
         // delete the file if there are no more hard links
+        MemoryINode node = iNodeTable.getINode(path);
+        if(node.getStat().st_nlink.intValue() == 0){
+            iNodeTable.removeINode(path);
+        }
         return 0;
     }
 
