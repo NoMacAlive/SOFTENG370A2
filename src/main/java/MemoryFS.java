@@ -14,7 +14,6 @@ import util.MemoryVisualiser;
 
 import java.io.IOException;
 import java.util.Objects;
-import java.util.Set;
 
 import com.sun.security.auth.module.UnixSystem;
 
@@ -39,21 +38,21 @@ public class MemoryFS extends FileSystemStub {
         // you will have to add more stat information here eventually
         stat.st_mode.set(FileStat.S_IFREG | 0444 | 0200);
         stat.st_size.set(HELLO_STR.getBytes().length);
+        stat.st_atim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_atim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        stat.st_mtim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        stat.st_mtim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_ctim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_ctim.tv_sec.set(System.currentTimeMillis()/ 1000);
+
         stat.st_uid.set(unix.getUid());
         stat.st_gid.set(unix.getGid());
         stat.st_nlink.set(1);
-        
-
-        // stat.st_birthtime.tv_sec.set(System.currentTimeMillis());
         iNode.setStat(stat);
         iNode.setContent(HELLO_STR.getBytes());
         iNodeTable.updateINode(HELLO_PATH, iNode);
-        // stat.st_birthtime.tv_nsec.set(System.currentTimeMillis());
-        // stat.st_atim.tv_nsec.set(System.currentTimeMillis());
-        // stat.st_mtim.tv_nsec.set(System.currentTimeMillis());
-        // stat.st_birthtime.tv_sec.set(System.currentTimeMillis());
-        // stat.st_atim.tv_sec.set(System.currentTimeMillis());
-        // stat.st_mtim.tv_sec.set(System.currentTimeMillis());
+        
+
         if (isVisualised()) {
             visualiser = new MemoryVisualiser();
             visualiser.sendINodeTable(iNodeTable);
@@ -68,22 +67,23 @@ public class MemoryFS extends FileSystemStub {
         if (Objects.equals(path, "/")) { // minimal set up for the mount point root
             stat.st_mode.set(FileStat.S_IFDIR | 0755);
             stat.st_nlink.set(2);
+            
         } else if (iNodeTable.containsINode(path)) {
             FileStat savedStat = iNodeTable.getINode(path).getStat();
             // fill in the stat object with values from the savedStat object of your inode
             stat.st_mode.set(savedStat.st_mode.intValue());
             stat.st_size.set(savedStat.st_size.intValue());
-            // stat.st_uid.set(savedStat.st_uid.intValue());
-            // stat.st_gid.set(savedStat.st_gid.intValue());
-            // stat.st_nlink.set(savedStat.st_nlink.intValue());
-            // stat.st_birthtime.tv_nsec.set(savedStat.st_birthtime.tv_nsec.intValue());
-            // stat.st_atim.tv_nsec.set(savedStat.st_atim.tv_nsec.intValue());
-            // stat.st_mtim.tv_nsec.set(savedStat.st_mtim.tv_nsec.intValue());
-            // stat.st_birthtime.tv_sec.set(savedStat.st_birthtime.tv_sec.intValue());
-            // stat.st_atim.tv_sec.set(savedStat.st_atim.tv_sec.intValue());
-            // stat.st_mtim.tv_sec.set(savedStat.st_mtim.tv_sec.intValue());
 
-            // stat.st_birthtime.tv_sec.set(savedStat.st_birthtime.tv_sec.intValue());
+            stat.st_uid.set(savedStat.st_uid.intValue());
+            stat.st_gid.set(savedStat.st_gid.intValue());
+            stat.st_nlink.set(savedStat.st_nlink.intValue());
+
+            stat.st_ctim.tv_nsec.set(savedStat.st_ctim.tv_nsec.longValue());
+            stat.st_atim.tv_nsec.set(savedStat.st_atim.tv_nsec.longValue());
+            stat.st_mtim.tv_nsec.set(savedStat.st_mtim.tv_nsec.longValue());
+            stat.st_ctim.tv_sec.set(savedStat.st_ctim.tv_sec.longValue());
+            stat.st_atim.tv_sec.set(savedStat.st_atim.tv_sec.longValue());
+            stat.st_mtim.tv_sec.set(savedStat.st_mtim.tv_sec.longValue());
 
         } else {
             res = -ErrorCodes.ENOENT();
@@ -102,8 +102,7 @@ public class MemoryFS extends FileSystemStub {
         //      off - just use 0
         filler.apply(buf, ".", null, 0);
         filler.apply(buf, "..", null, 0);
-        Set<String> fileEntries = iNodeTable.entries();
-        for(String s : fileEntries){
+        for(String s : iNodeTable.entries()){
             MemoryINode n = iNodeTable.getINode(s);
             filler.apply(buf, s.substring(1) ,n.getStat(),0);
         }
@@ -129,9 +128,9 @@ public class MemoryFS extends FileSystemStub {
         // you need to extract data from the content field of the inode and place it in the buffer
         // something like:
         // buf.put(0, content, offset, amount);
-        int amount = 0;
-        // MemoryINode n = iNodeTable.getINode(path);
-        // buf.put(0,n.getContent(),(int)offset,amount);
+        MemoryINode n = iNodeTable.getINode(path);
+        int amount = n.getContent().length;
+        buf.put(0,n.getContent() ,(int)offset,amount);
         if (isVisualised()) {
             visualiser.sendINodeTable(iNodeTable);
         }
@@ -146,7 +145,15 @@ public class MemoryFS extends FileSystemStub {
         }
         // similar to read but you get data from the buffer like:
         // buf.get(0, content, offset, size);
-
+        MemoryINode n = iNodeTable.getINode(path);
+        byte[] originalContent = n.getContent();
+        byte[] content = new byte[(int)size];
+        byte[] c = new byte[originalContent.length + content.length];
+        for(int i=0; i<originalContent.length;i++){
+            c[i] = originalContent[i];
+        }
+        buf.get(0, c, (int)offset, (int)size);
+        n.setContent(c);
         if (isVisualised()) {
             visualiser.sendINodeTable(iNodeTable);
         }
@@ -183,6 +190,15 @@ public class MemoryFS extends FileSystemStub {
         // You need to set the corresponding fields of the inode's stat object.
         // You can access the data in the Timespec objects with "get()" and "longValue()".
         // You have to find out which time fields these correspond to.
+
+        FileStat savedStat = iNodeTable.getINode(path).getStat();
+        // savedStat.st_ctim.tv_nsec.set(timespec[0].tv_nsec.longValue());
+        // savedStat.st_ctim.tv_sec.set(timespec[0].tv_sec.longValue());
+        savedStat.st_atim.tv_nsec.set(timespec[0].tv_nsec.longValue());
+        savedStat.st_atim.tv_sec.set(timespec[0].tv_sec.longValue());
+        savedStat.st_mtim.tv_nsec.set(timespec[1].tv_nsec.longValue());
+        savedStat.st_mtim.tv_sec.set(timespec[1].tv_sec.longValue());
+        
         // timespec[0].tv_nsec
         // timespec[0].tv_sec
         // timespec[1].tv_nsec

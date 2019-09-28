@@ -31,6 +31,7 @@ public class MemoryVisualiser {
     private void startConnection() throws IOException {
         clientSocket = new Socket(HOST, PORT);
         out = new PrintWriter(clientSocket.getOutputStream(), true);
+
     }
 
     public void sendINodeTable(MemoryINodeTable mockINodeTable) {
