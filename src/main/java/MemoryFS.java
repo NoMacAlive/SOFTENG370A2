@@ -38,10 +38,13 @@ public class MemoryFS extends FileSystemStub {
         // you will have to add more stat information here eventually
         stat.st_mode.set(FileStat.S_IFREG | 0444 | 0200);
         stat.st_size.set(HELLO_STR.getBytes().length);
+        //access time
         stat.st_atim.tv_nsec.set(System.currentTimeMillis()*1000000);
         stat.st_atim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        //modified time
         stat.st_mtim.tv_sec.set(System.currentTimeMillis()/ 1000);
         stat.st_mtim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        //created time
         stat.st_ctim.tv_nsec.set(System.currentTimeMillis()*1000000);
         stat.st_ctim.tv_sec.set(System.currentTimeMillis()/ 1000);
 
@@ -78,12 +81,18 @@ public class MemoryFS extends FileSystemStub {
             stat.st_gid.set(savedStat.st_gid.intValue());
             stat.st_nlink.set(savedStat.st_nlink.intValue());
 
-            stat.st_ctim.tv_nsec.set(savedStat.st_ctim.tv_nsec.longValue());
-            stat.st_atim.tv_nsec.set(savedStat.st_atim.tv_nsec.longValue());
-            stat.st_mtim.tv_nsec.set(savedStat.st_mtim.tv_nsec.longValue());
+            //creation time
             stat.st_ctim.tv_sec.set(savedStat.st_ctim.tv_sec.longValue());
+            stat.st_ctim.tv_nsec.set(savedStat.st_ctim.tv_nsec.longValue());
+            //access time
+            stat.st_atim.tv_nsec.set(savedStat.st_atim.tv_nsec.longValue());
             stat.st_atim.tv_sec.set(savedStat.st_atim.tv_sec.longValue());
+            //modified time
+            stat.st_mtim.tv_nsec.set(savedStat.st_mtim.tv_nsec.longValue());
             stat.st_mtim.tv_sec.set(savedStat.st_mtim.tv_sec.longValue());
+            
+
+            
 
         } else {
             res = -ErrorCodes.ENOENT();
@@ -130,7 +139,10 @@ public class MemoryFS extends FileSystemStub {
         // buf.put(0, content, offset, amount);
         MemoryINode n = iNodeTable.getINode(path);
         int amount = n.getContent().length;
-        buf.put(0,n.getContent() ,(int)offset,amount);
+        buf.put(0, n.getContent() ,(int)offset, amount);
+        FileStat stat = n.getStat();
+        stat.st_atim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        stat.st_atim.tv_nsec.set(System.currentTimeMillis()*1000000);
         if (isVisualised()) {
             visualiser.sendINodeTable(iNodeTable);
         }
@@ -152,8 +164,17 @@ public class MemoryFS extends FileSystemStub {
         for(int i=0; i<originalContent.length;i++){
             c[i] = originalContent[i];
         }
+
         buf.get(0, c, (int)offset, (int)size);
         n.setContent(c);
+        FileStat stat = n.getStat();
+        stat.st_size.set(c.length);
+        //modified time
+        stat.st_mtim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        stat.st_mtim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        //access time
+        stat.st_atim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        stat.st_atim.tv_nsec.set(System.currentTimeMillis()*1000000);
         if (isVisualised()) {
             visualiser.sendINodeTable(iNodeTable);
         }
@@ -225,6 +246,9 @@ public class MemoryFS extends FileSystemStub {
     
     @Override
     public int link(java.lang.String oldpath, java.lang.String newpath) {
+        MemoryINode n = iNodeTable.getINode(oldpath);
+        n.getStat().st_nlink.set(n.getStat().st_nlink.intValue()+1);
+        iNodeTable.updateINode(newpath, n);
         return 0;
     }
 
