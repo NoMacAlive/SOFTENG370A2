@@ -168,13 +168,21 @@ public class MemoryFS extends FileSystemStub {
         buf.get(0, c, (int)offset, (int)size);
         n.setContent(c);
         FileStat stat = n.getStat();
-        stat.st_size.set(c.length);
+
         //modified time
         stat.st_mtim.tv_sec.set(System.currentTimeMillis()/ 1000);
         stat.st_mtim.tv_nsec.set(System.currentTimeMillis()*1000000);
         //access time
         stat.st_atim.tv_sec.set(System.currentTimeMillis()/ 1000);
         stat.st_atim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        //if the meta data got modified
+        if(stat.st_size.intValue() == c.length){
+            stat.st_size.set(c.length);
+            //changed time
+            stat.st_ctim.tv_sec.set(System.currentTimeMillis()/ 1000);
+            stat.st_ctim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        }
+        
         if (isVisualised()) {
             visualiser.sendINodeTable(iNodeTable);
         }
@@ -247,7 +255,10 @@ public class MemoryFS extends FileSystemStub {
     @Override
     public int link(java.lang.String oldpath, java.lang.String newpath) {
         MemoryINode n = iNodeTable.getINode(oldpath);
+        FileStat stat = n.getStat();
         n.getStat().st_nlink.set(n.getStat().st_nlink.intValue()+1);
+        stat.st_ctim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_ctim.tv_sec.set(System.currentTimeMillis()/ 1000);
         iNodeTable.updateINode(newpath, n);
         return 0;
     }
@@ -259,7 +270,11 @@ public class MemoryFS extends FileSystemStub {
         }
         // delete the file if there are no more hard links
         MemoryINode node = iNodeTable.getINode(path);
-        if(node.getStat().st_nlink.intValue() == 0){
+        FileStat stat = node.getStat();
+        node.getStat().st_nlink.set(node.getStat().st_nlink.intValue()-1);
+        stat.st_ctim.tv_nsec.set(System.currentTimeMillis()*1000000);
+        stat.st_ctim.tv_sec.set(System.currentTimeMillis()/ 1000);
+        if(node.getStat().st_nlink.intValue() <= 1){
             iNodeTable.removeINode(path);
         }
         return 0;
